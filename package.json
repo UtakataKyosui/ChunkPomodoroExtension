@@ -1,0 +1,33 @@
+{
+  "name": "chunk-pomodoro-setter",
+  "displayName": "チャンクポモドーロセッター",
+  "version": "1.0.0",
+  "description": "Time management Chrome extension using 2-hour chunks combined with the Pomodoro technique",
+  "main": "index.js",
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "package": "plasmo package"
+  },
+  "keywords": [
+    "chrome-extension",
+    "pomodoro",
+    "time-management",
+    "productivity"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "plasmo": "^0.90.5"
+  },
+  "manifest": {
+    "version": 3
+  },
+  "dependencies": {
+    "@types/chrome": "^0.0.326",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
