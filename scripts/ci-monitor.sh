@@ -78,7 +78,7 @@ analyze_and_fix() {
     fi
     
     # Check for dependency/package errors
-    if echo "$logs" | grep -q "npm ERR!\|Cannot resolve\|Module not found\|Missing.*from lock file"; then
+    if echo "$logs" | grep -q "npm ERR!\|Cannot resolve\|Module not found\|Missing.*from lock file\|package-lock.json"; then
         echo -e "${RED}❌ Found dependency error${NC}"
         fix_dependency_issues
         fixes_applied=true
@@ -224,8 +224,12 @@ module.exports = {
 EOF
     fi
     
-    # Clean install
-    rm -rf node_modules package-lock.json
+    # Clean install - handle missing package-lock.json
+    rm -rf node_modules
+    if [ -f package-lock.json ]; then
+        echo -e "${YELLOW}🔄 Regenerating package-lock.json...${NC}"
+        rm package-lock.json
+    fi
     npm install
     
     echo -e "${GREEN}✅ Dependencies fixed and reinstalled${NC}"
