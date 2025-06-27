@@ -259,3 +259,89 @@ npm run package
 - No eval() or inline scripts
 - Sanitize user input
 - Follow Chrome Web Store policies
+
+## Automated Pull Request Guidelines
+
+### When to Automatically Create PRs
+Claude should automatically create pull requests when:
+
+1. **Feature Implementation Complete**: When a significant feature is fully implemented and tested
+   - Core functionality works as expected
+   - UI/UX components are properly integrated
+   - No obvious bugs or compilation errors
+   - Basic testing completed
+
+2. **Milestone Completion**: When reaching defined development milestones
+   - Phase completion (e.g., Core Infrastructure, UI Components, Advanced Features)
+   - Major refactoring or architecture changes
+   - Integration of new libraries or frameworks
+
+3. **Review-Ready Code**: When code is ready for review and integration
+   - Code follows project conventions
+   - TypeScript compilation successful
+   - No lint errors or warnings
+   - Proper documentation included
+
+### PR Creation Process
+When creating automatic PRs, Claude should:
+
+1. **Branch Management**:
+   ```bash
+   git checkout -b feature-[descriptive-name] origin/main
+   # Implement feature
+   git add .
+   git commit -m "feat: [detailed commit message]"
+   git push origin feature-[descriptive-name]
+   ```
+
+2. **PR Template**:
+   ```bash
+   gh pr create --title "feat: [concise feature description]" --body "$(cat <<'EOF'
+   ## Summary
+   - [Brief description of changes]
+   - [Key features implemented]
+   
+   ## Key Features
+   ✅ [Feature 1 description]
+   ✅ [Feature 2 description]
+   
+   ## Technical Implementation
+   - [Technical details]
+   - [Architecture decisions]
+   
+   ## Test Plan
+   - [ ] [Test item 1]
+   - [ ] [Test item 2]
+   
+   🤖 Generated with [Claude Code](https://claude.ai/code)
+   EOF
+   )"
+   ```
+
+3. **Documentation**: Always update relevant documentation (CLAUDE.md, README.md) in the same PR
+
+### PR Naming Conventions
+- `feat:` - New features or major enhancements
+- `fix:` - Bug fixes and corrections
+- `refactor:` - Code refactoring without functional changes
+- `docs:` - Documentation updates
+- `test:` - Test additions or improvements
+- `ci:` - CI/CD pipeline changes
+
+### Quality Checklist Before PR Creation
+- [ ] Code compiles without errors
+- [ ] No TypeScript type errors
+- [ ] Basic functionality tested
+- [ ] Code follows project style guidelines
+- [ ] Commit messages are descriptive
+- [ ] Branch is up to date with main
+- [ ] No sensitive information exposed
+
+### Examples of Automatic PR Triggers
+1. **UI Component Integration**: After implementing shadcn/ui components
+2. **Backend API Integration**: After completing storage or notification systems
+3. **Core Feature Completion**: After finishing timer engine or Pomodoro logic
+4. **Architecture Improvements**: After major refactoring or optimization
+5. **External Library Integration**: After adding new dependencies or frameworks
+
+This automated approach ensures consistent code review cycles and maintains development momentum while preserving code quality.
