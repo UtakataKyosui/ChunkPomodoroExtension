@@ -1,0 +1,200 @@
+name: Release Chrome Extension
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.check.outputs.should-release }}
+      new-version: ${{ steps.version.outputs.new-version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check if release is needed
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should-release=true" >> $GITHUB_OUTPUT
+          else
+            # Check for [release] in commit message or significant changes
+            LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
+            if [[ "$LAST_COMMIT_MSG" == *"[release]"* ]] || [[ "$LAST_COMMIT_MSG" == *"feat:"* ]] || [[ "$LAST_COMMIT_MSG" == *"fix:"* ]]; then
+              echo "should-release=true" >> $GITHUB_OUTPUT
+            else
+              echo "should-release=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Determine version bump
+        id: version
+        if: steps.check.outputs.should-release == 'true'
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            BUMP_TYPE="${{ github.event.inputs.version_type }}"
+          else
+            LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
+            if [[ "$LAST_COMMIT_MSG" == *"BREAKING CHANGE"* ]] || [[ "$LAST_COMMIT_MSG" == *"feat!"* ]]; then
+              BUMP_TYPE="major"
+            elif [[ "$LAST_COMMIT_MSG" == *"feat:"* ]]; then
+              BUMP_TYPE="minor"
+            else
+              BUMP_TYPE="patch"
+            fi
+          fi
+          
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          
+          case $BUMP_TYPE in
+            major)
+              NEW_VERSION="$((MAJOR + 1)).0.0"
+              ;;
+            minor)
+              NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+              ;;
+            patch)
+              NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+              ;;
+          esac
+          
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+          echo "New version: $NEW_VERSION"
+
+  build-and-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update version in package.json
+        run: |
+          NEW_VERSION="${{ needs.check-changes.outputs.new-version }}"
+          npm version $NEW_VERSION --no-git-tag-version
+
+      - name: Build extension
+        run: |
+          npm run build
+          npm run package
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [[ -z "$LAST_TAG" ]]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --reverse)
+          else
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --reverse)
+          fi
+          
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "## What's Changed" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Git tag
+        run: |
+          NEW_VERSION="${{ needs.check-changes.outputs.new-version }}"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to v$NEW_VERSION" || exit 0
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          git push origin main
+          git push origin "v$NEW_VERSION"
+
+      - name: Find extension package
+        id: find-package
+        run: |
+          PACKAGE_PATH=$(find build -name "*.zip" -type f | head -1)
+          echo "package-path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
+          echo "package-name=$(basename $PACKAGE_PATH)" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.check-changes.outputs.new-version }}
+          release_name: チャンクポモドーロセッター v${{ needs.check-changes.outputs.new-version }}
+          body: |
+            # チャンクポモドーロセッター v${{ needs.check-changes.outputs.new-version }}
+            
+            ${{ steps.changelog.outputs.CHANGELOG }}
+            
+            ## Installation
+            1. Download the `${{ steps.find-package.outputs.package-name }}` file below
+            2. Open Chrome and go to `chrome://extensions/`
+            3. Enable "Developer mode" in the top right
+            4. Drag and drop the downloaded file or use "Load unpacked" after extracting
+            
+            ## Chrome Web Store
+            This extension will be available on the Chrome Web Store soon.
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.find-package.outputs.package-path }}
+          asset_name: ${{ steps.find-package.outputs.package-name }}
+          asset_content_type: application/zip
+
+      - name: Update Chrome Web Store (Optional)
+        if: false  # Enable this when you have Chrome Web Store credentials
+        run: |
+          # Placeholder for Chrome Web Store upload
+          # You'll need to set up CHROME_EXTENSION_ID and CHROME_CLIENT_SECRET secrets
+          echo "Chrome Web Store upload would happen here"
+          echo "Extension ID: $CHROME_EXTENSION_ID"
