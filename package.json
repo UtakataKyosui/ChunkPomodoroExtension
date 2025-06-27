@@ -7,7 +7,15 @@
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
-    "package": "plasmo package"
+    "package": "plasmo package",
+    "build:extension": "npm run build && npm run package",
+    "release:patch": "./scripts/release.sh patch",
+    "release:minor": "./scripts/release.sh minor",
+    "release:major": "./scripts/release.sh major",
+    "ci:monitor": "./scripts/ci-monitor.sh",
+    "ci:status": "./scripts/ci-utils.sh status",
+    "ci:logs": "./scripts/ci-utils.sh logs",
+    "ci:watch": "./scripts/ci-utils.sh watch"
   },
   "keywords": [
     "chrome-extension",
@@ -19,15 +27,12 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^24.0.4",
+    "@tailwindcss/postcss": "^4.0.0-alpha.26",
     "autoprefixer": "^10.4.21",
     "plasmo": "^0.90.5",
     "postcss": "^8.5.6",
-    "shadcn-ui": "^0.9.5",
-    "tailwindcss": "^4.1.11",
+    "tailwindcss": "^4.0.0-alpha.26",
     "tailwindcss-animate": "^1.0.7"
-  },
-  "manifest": {
-    "version": 3
   },
   "dependencies": {
     "@radix-ui/react-progress": "^1.1.7",
