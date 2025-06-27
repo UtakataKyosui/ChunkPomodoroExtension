@@ -1,0 +1,211 @@
+name: Build Chrome Extension
+
+on:
+  push:
+    branches: [main, build-to-zipfile-release]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
+      - name: Create icons
+        run: |
+          mkdir -p assets
+          # Create a pomodoro timer icon using ImageMagick
+          convert -size 128x128 xc:transparent \
+            -fill "#FF6B6B" -draw "circle 64,64 64,20" \
+            -fill "#FFFFFF" -draw "circle 64,64 44,20" \
+            -stroke "#333333" -strokewidth 2 -fill none -draw "circle 64,64 44,20" \
+            -stroke "#333333" -strokewidth 3 -draw "line 64,64 64,30" \
+            -stroke "#333333" -strokewidth 2 -draw "line 64,64 92,64" \
+            -fill "#333333" -draw "circle 64,64 3,0" \
+            assets/icon.png
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update version (if manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          BUMP_TYPE="${{ github.event.inputs.version_type }}"
+          
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          
+          case $BUMP_TYPE in
+            major)
+              NEW_VERSION="$((MAJOR + 1)).0.0"
+              ;;
+            minor)
+              NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+              ;;
+            patch)
+              NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+              ;;
+          esac
+          
+          npm version $NEW_VERSION --no-git-tag-version
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Build extension
+        run: |
+          npm run build
+          npm run package
+
+      - name: Find extension package
+        id: find-package
+        run: |
+          PACKAGE_PATH=$(find build -name "*.zip" -type f | head -1)
+          if [ -z "$PACKAGE_PATH" ]; then
+            echo "❌ No extension package found!"
+            exit 1
+          fi
+          echo "package-path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
+          echo "package-name=$(basename $PACKAGE_PATH)" >> $GITHUB_OUTPUT
+          echo "✅ Extension package: $PACKAGE_PATH"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension-${{ github.sha }}
+          path: ${{ steps.find-package.outputs.package-path }}
+          retention-days: 30
+
+      - name: Create Git tag and release (main branch only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        run: |
+          NEW_VERSION="${{ env.NEW_VERSION }}"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to v$NEW_VERSION" || exit 0
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          git push origin main
+          git push origin "v$NEW_VERSION"
+
+      - name: Generate changelog
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        id: changelog
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [[ -z "$LAST_TAG" ]]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --reverse)
+          else
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --reverse)
+          fi
+          
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "## What's Changed" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.NEW_VERSION }}
+          release_name: チャンクポモドーロセッター v${{ env.NEW_VERSION }}
+          body: |
+            # チャンクポモドーロセッター v${{ env.NEW_VERSION }}
+            
+            ${{ steps.changelog.outputs.CHANGELOG }}
+            
+            ## Installation
+            1. Download the `${{ steps.find-package.outputs.package-name }}` file below
+            2. Open Chrome and go to `chrome://extensions/`
+            3. Enable "Developer mode" in the top right
+            4. Drag and drop the downloaded file or use "Load unpacked" after extracting
+            
+            ## Features
+            - 2-hour chunk time management
+            - Traditional Pomodoro technique integration
+            - Task organization within chunks
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.find-package.outputs.package-path }}
+          asset_name: ${{ steps.find-package.outputs.package-name }}
+          asset_content_type: application/zip
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('🔧 Extension Build Ready')
+            );
+            
+            const commentBody = `🔧 **Extension Build Ready**
+            
+            Preview build is available for testing:
+            - **Artifact**: \`${{ steps.find-package.outputs.package-name }}\`
+            - **SHA**: \`${{ github.sha }}\`
+            
+            📦 Download the build artifact from the Actions tab to test the extension locally.
+            
+            ✅ Build completed successfully`;
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+            }

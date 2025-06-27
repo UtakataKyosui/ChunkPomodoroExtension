@@ -8,7 +8,7 @@
     "dev": "plasmo dev",
     "build": "plasmo build",
     "package": "plasmo package",
-    "release": "./scripts/release.sh",
+    "build:extension": "npm run build && npm run package",
     "release:patch": "./scripts/release.sh patch",
     "release:minor": "./scripts/release.sh minor",
     "release:major": "./scripts/release.sh major",
