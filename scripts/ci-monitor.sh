@@ -78,7 +78,7 @@ analyze_and_fix() {
     fi
     
     # Check for dependency/package errors
-    if echo "$logs" | grep -q "npm ERR!\|Cannot resolve\|Module not found"; then
+    if echo "$logs" | grep -q "npm ERR!\|Cannot resolve\|Module not found\|Missing.*from lock file"; then
         echo -e "${RED}❌ Found dependency error${NC}"
         fix_dependency_issues
         fixes_applied=true
@@ -203,11 +203,28 @@ EOF
 fix_dependency_issues() {
     echo -e "${BLUE}🔧 Fixing dependency issues...${NC}"
     
+    # Fix TailwindCSS version conflicts
+    if grep -q "tailwindcss.*4\." package.json; then
+        echo -e "${YELLOW}📦 Downgrading TailwindCSS to stable v3...${NC}"
+        sed -i 's/"tailwindcss": "^4\.[^"]*"/"tailwindcss": "^3.4.16"/g' package.json
+        sed -i '/@tailwindcss\/postcss/d' package.json
+        
+        # Fix postcss config for v3
+        cat > postcss.config.js << 'EOF'
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+EOF
+    fi
+    
     # Clean install
     rm -rf node_modules package-lock.json
     npm install
     
-    echo -e "${GREEN}✅ Dependencies reinstalled${NC}"
+    echo -e "${GREEN}✅ Dependencies fixed and reinstalled${NC}"
 }
 
 fix_compilation_issues() {
