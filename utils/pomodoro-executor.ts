@@ -142,9 +142,55 @@ export class PomodoroExecutor {
   }
 
   private async restoreSession(sessionData: any): Promise<void> {
-    // Logic to restore timer state would go here
-    // This is a simplified version
-    console.log('Restoring session:', sessionData);
+    try {
+      // Validate session data
+      if (!sessionData || !sessionData.id || !sessionData.type) {
+        throw new Error('Invalid session data for restoration');
+      }
+
+      // Calculate elapsed time and remaining time
+      const now = Date.now();
+      const startTime = new Date(sessionData.startTime).getTime();
+      const elapsed = now - startTime;
+      const originalDuration = sessionData.duration;
+      const remaining = Math.max(0, originalDuration - elapsed);
+
+      // If session has expired, mark as completed
+      if (remaining <= 0) {
+        console.log('Session expired during restoration, marking as completed');
+        // Don't restore, session has already completed
+        return;
+      }
+
+      // Create a new timer with remaining time for the session
+      const currentSession = {
+        id: sessionData.id,
+        type: sessionData.type as PomodoroType,
+        duration: originalDuration,
+        startTime: new Date(startTime),
+        endTime: null,
+        completed: false,
+        taskId: sessionData.taskId || null
+      };
+
+      // Restore the timer state in PomodoroManager
+      if (sessionData.isRunning && !sessionData.isPaused) {
+        // Create a new session that continues from where it left off
+        this.pomodoroManager.startWorkSession(sessionData.taskId);
+        
+        // Update the internal timer to reflect the correct remaining time
+        const timer = (this.pomodoroManager as any).timer;
+        if (timer) {
+          timer.state.remaining = remaining;
+          timer.state.startTime = startTime;
+        }
+      }
+
+      console.log(`Session restored: ${sessionData.type} session with ${Math.floor(remaining / 1000)}s remaining`);
+    } catch (error) {
+      console.error('Failed to restore session:', error);
+      this.callbacks.onError?.(error as Error);
+    }
   }
 
   private handleSessionStart(session: PomodoroSession): void {

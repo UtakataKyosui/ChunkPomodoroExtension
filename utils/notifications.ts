@@ -21,6 +21,7 @@ export interface NotificationCallbacks {
 export class NotificationManager {
   private callbacks: NotificationCallbacks;
   private activeNotifications: Map<string, NotificationOptions> = new Map();
+  private webNotificationRefs: Map<string, Notification> = new Map();
 
   constructor(callbacks: NotificationCallbacks = {}) {
     this.callbacks = callbacks;
@@ -144,12 +145,17 @@ export class NotificationManager {
       silent: options.silent || false
     });
 
+    // Store reference for later closing
+    this.webNotificationRefs.set(notificationId, notification);
+
     notification.onclick = () => {
       this.callbacks.onClicked?.(notificationId);
+      notification.close();
     };
 
     notification.onclose = () => {
       this.activeNotifications.delete(notificationId);
+      this.webNotificationRefs.delete(notificationId);
       this.callbacks.onClosed?.(notificationId, true);
     };
 
@@ -166,6 +172,12 @@ export class NotificationManager {
       });
     }
 
+    // For web notifications, close the actual notification
+    const notification = this.webNotificationRefs.get(notificationId);
+    if (notification) {
+      notification.close();
+      this.webNotificationRefs.delete(notificationId);
+    }
     this.activeNotifications.delete(notificationId);
   }
 
@@ -186,6 +198,11 @@ export class NotificationManager {
       });
     }
 
+    // For web notifications, close all notification references
+    for (const notification of this.webNotificationRefs.values()) {
+      notification.close();
+    }
+    this.webNotificationRefs.clear();
     this.activeNotifications.clear();
   }
 
@@ -247,17 +264,45 @@ export function createRemindNotification(sessionType: 'work' | 'break'): Notific
 
 export async function playNotificationSound(soundFile: string = 'notification.mp3'): Promise<void> {
   try {
-    const audio = new Audio(`/assets/sounds/${soundFile}`);
-    audio.volume = 0.5;
-    await audio.play();
+    // Chrome extension context - sounds in notifications are handled differently
+    if (typeof chrome !== 'undefined' && chrome.notifications) {
+      // Chrome extensions can't directly play audio files in service workers
+      // Sound is handled through notification options
+      console.log('Sound playback handled by Chrome notification system');
+      return;
+    }
+
+    // Web context - use HTML5 Audio API
+    if (typeof Audio !== 'undefined') {
+      const audio = new Audio(`/assets/sounds/${soundFile}`);
+      audio.volume = 0.5;
+      
+      // Handle autoplay policy restrictions
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        await playPromise;
+      }
+    } else {
+      console.warn('Audio API not available in this environment');
+    }
   } catch (error) {
+    // Silently handle autoplay policy restrictions and other audio errors
     console.warn('Failed to play notification sound:', error);
   }
 }
 
 export function vibrate(pattern: number | number[] = 200): boolean {
-  if ('vibrate' in navigator) {
-    return navigator.vibrate(pattern);
+  try {
+    // Check if vibrate API is available (primarily mobile devices)
+    if ('vibrate' in navigator && typeof navigator.vibrate === 'function') {
+      return navigator.vibrate(pattern);
+    }
+    
+    // Desktop environments or unsupported browsers
+    console.log('Vibration API not available in this environment');
+    return false;
+  } catch (error) {
+    console.warn('Failed to trigger vibration:', error);
+    return false;
   }
-  return false;
 }
