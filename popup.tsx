@@ -1,41 +1,94 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Play, Pause, Square, Clock, Timer, Settings, CheckCircle } from "lucide-react"
 import { Button } from "./components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card"
 import { Progress } from "./components/ui/progress"
+import { PomodoroManager, createPomodoroManager, DEFAULT_POMODORO_SETTINGS, PomodoroSession, PomodoroType } from "./utils/pomodoro"
 import "./styles/globals.css"
 
 interface PomodoroState {
-  currentSession: 'work' | 'shortBreak' | 'longBreak' | null;
-  isRunning: boolean;
-  isPaused: boolean;
-  remainingTime: number; // seconds
-  totalTime: number; // seconds
+  currentSession: PomodoroSession | null;
+  remainingTime: number; // milliseconds
   currentTask: string;
   completedPomodoros: number;
   currentChunkTime: number; // minutes remaining in chunk
 }
 
 function IndexPopup() {
+  const pomodoroManager = useRef<PomodoroManager | null>(null);
   const [state, setState] = useState<PomodoroState>({
     currentSession: null,
-    isRunning: false,
-    isPaused: false,
-    remainingTime: 25 * 60, // 25 minutes
-    totalTime: 25 * 60,
+    remainingTime: 25 * 60 * 1000, // 25 minutes in milliseconds
     currentTask: "作業に集中しましょう",
     completedPomodoros: 0,
     currentChunkTime: 120 // 2 hours
   });
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+  // Initialize PomodoroManager
+  useEffect(() => {
+    pomodoroManager.current = createPomodoroManager(DEFAULT_POMODORO_SETTINGS, {
+      onTick: (session, remaining) => {
+        setState(prev => ({
+          ...prev,
+          remainingTime: remaining
+        }));
+      },
+      onSessionStart: (session) => {
+        setState(prev => ({
+          ...prev,
+          currentSession: session
+        }));
+      },
+      onSessionComplete: (session) => {
+        if (session.type === 'work') {
+          setState(prev => ({
+            ...prev,
+            completedPomodoros: prev.completedPomodoros + 1,
+            currentSession: null,
+            remainingTime: 25 * 60 * 1000
+          }));
+        } else {
+          setState(prev => ({
+            ...prev,
+            currentSession: null,
+            remainingTime: 25 * 60 * 1000
+          }));
+        }
+      },
+      onSessionPause: (session) => {
+        setState(prev => ({ ...prev, currentSession: session }));
+      },
+      onSessionResume: (session) => {
+        setState(prev => ({ ...prev, currentSession: session }));
+      },
+      onSessionStop: (session) => {
+        setState(prev => ({
+          ...prev,
+          currentSession: null,
+          remainingTime: 25 * 60 * 1000
+        }));
+      }
+    });
+
+    return () => {
+      if (pomodoroManager.current) {
+        pomodoroManager.current.destroy();
+      }
+    };
+  }, []);
+
+  const formatTime = (milliseconds: number): string => {
+    const totalSeconds = Math.ceil(milliseconds / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const getSessionTitle = () => {
-    switch (state.currentSession) {
+    if (!state.currentSession) {
+      return 'ポモドーロタイマー';
+    }
+    switch (state.currentSession.type) {
       case 'work':
         return '作業時間';
       case 'shortBreak':
@@ -48,98 +101,62 @@ function IndexPopup() {
   };
 
   const getProgressPercent = () => {
-    if (state.totalTime === 0) return 0;
-    return ((state.totalTime - state.remainingTime) / state.totalTime) * 100;
+    if (!state.currentSession) return 0;
+    const totalTime = state.currentSession.duration;
+    if (totalTime === 0) return 0;
+    return ((totalTime - state.remainingTime) / totalTime) * 100;
   };
 
   const handleStartWork = () => {
-    setState(prev => ({
-      ...prev,
-      currentSession: 'work',
-      isRunning: true,
-      isPaused: false,
-      remainingTime: 25 * 60,
-      totalTime: 25 * 60
-    }));
+    if (pomodoroManager.current) {
+      try {
+        pomodoroManager.current.startWorkSession();
+      } catch (error) {
+        console.error('Failed to start work session:', error);
+      }
+    }
   };
 
   const handleStartBreak = () => {
-    const isLongBreak = state.completedPomodoros > 0 && state.completedPomodoros % 4 === 0;
-    const breakTime = isLongBreak ? 15 * 60 : 5 * 60;
-    
-    setState(prev => ({
-      ...prev,
-      currentSession: isLongBreak ? 'longBreak' : 'shortBreak',
-      isRunning: true,
-      isPaused: false,
-      remainingTime: breakTime,
-      totalTime: breakTime
-    }));
+    if (pomodoroManager.current) {
+      try {
+        pomodoroManager.current.startBreakSession();
+      } catch (error) {
+        console.error('Failed to start break session:', error);
+      }
+    }
   };
 
   const handlePause = () => {
-    setState(prev => ({
-      ...prev,
-      isPaused: true,
-      isRunning: false
-    }));
+    if (pomodoroManager.current) {
+      try {
+        pomodoroManager.current.pauseSession();
+      } catch (error) {
+        console.error('Failed to pause session:', error);
+      }
+    }
   };
 
   const handleResume = () => {
-    setState(prev => ({
-      ...prev,
-      isPaused: false,
-      isRunning: true
-    }));
+    if (pomodoroManager.current) {
+      try {
+        pomodoroManager.current.resumeSession();
+      } catch (error) {
+        console.error('Failed to resume session:', error);
+      }
+    }
   };
 
   const handleStop = () => {
-    setState(prev => ({
-      ...prev,
-      currentSession: null,
-      isRunning: false,
-      isPaused: false,
-      remainingTime: 25 * 60,
-      totalTime: 25 * 60
-    }));
+    if (pomodoroManager.current) {
+      try {
+        pomodoroManager.current.stopSession();
+      } catch (error) {
+        console.error('Failed to stop session:', error);
+      }
+    }
   };
 
-  // Timer effect (simplified for demo)
-  useEffect(() => {
-    if (!state.isRunning || state.isPaused) return;
-
-    const interval = setInterval(() => {
-      setState(prev => {
-        if (prev.remainingTime <= 1) {
-          // Session completed
-          if (prev.currentSession === 'work') {
-            return {
-              ...prev,
-              completedPomodoros: prev.completedPomodoros + 1,
-              currentSession: null,
-              isRunning: false,
-              remainingTime: 25 * 60,
-              totalTime: 25 * 60
-            };
-          } else {
-            return {
-              ...prev,
-              currentSession: null,
-              isRunning: false,
-              remainingTime: 25 * 60,
-              totalTime: 25 * 60
-            };
-          }
-        }
-        return {
-          ...prev,
-          remainingTime: prev.remainingTime - 1
-        };
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [state.isRunning, state.isPaused]);
 
   return (
     <div className="w-96 p-4 bg-background text-foreground">
@@ -168,7 +185,7 @@ function IndexPopup() {
 
           {/* Control Buttons */}
           <div className="flex justify-center space-x-2">
-            {!state.isRunning && !state.isPaused && (
+            {!state.currentSession && (
               <>
                 <Button onClick={handleStartWork} className="flex items-center space-x-2">
                   <Play className="h-4 w-4" />
@@ -181,7 +198,7 @@ function IndexPopup() {
               </>
             )}
             
-            {state.isRunning && !state.isPaused && (
+            {state.currentSession && pomodoroManager.current?.isSessionRunning() && (
               <>
                 <Button onClick={handlePause} variant="secondary" className="flex items-center space-x-2">
                   <Pause className="h-4 w-4" />
@@ -194,7 +211,7 @@ function IndexPopup() {
               </>
             )}
 
-            {state.isPaused && (
+            {state.currentSession && pomodoroManager.current?.isSessionPaused() && (
               <>
                 <Button onClick={handleResume} className="flex items-center space-x-2">
                   <Play className="h-4 w-4" />
@@ -243,13 +260,14 @@ function IndexPopup() {
       {state.currentSession && (
         <div className="mt-4 text-center">
           <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium ${
-            state.isRunning ? 'bg-green-100 text-green-800' : 
-            state.isPaused ? 'bg-yellow-100 text-yellow-800' : 
+            pomodoroManager.current?.isSessionRunning() ? 'bg-green-100 text-green-800' : 
+            pomodoroManager.current?.isSessionPaused() ? 'bg-yellow-100 text-yellow-800' : 
             'bg-gray-100 text-gray-800'
           }`}>
             <Clock className="h-3 w-3" />
             <span>
-              {state.isRunning ? '実行中' : state.isPaused ? '一時停止' : '待機中'}
+              {pomodoroManager.current?.isSessionRunning() ? '実行中' : 
+               pomodoroManager.current?.isSessionPaused() ? '一時停止' : '待機中'}
             </span>
           </div>
         </div>
