@@ -11,7 +11,11 @@
     "release": "./scripts/release.sh",
     "release:patch": "./scripts/release.sh patch",
     "release:minor": "./scripts/release.sh minor",
-    "release:major": "./scripts/release.sh major"
+    "release:major": "./scripts/release.sh major",
+    "ci:monitor": "./scripts/ci-monitor.sh",
+    "ci:status": "./scripts/ci-utils.sh status",
+    "ci:logs": "./scripts/ci-utils.sh logs",
+    "ci:watch": "./scripts/ci-utils.sh watch"
   },
   "keywords": [
     "chrome-extension",
