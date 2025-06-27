@@ -34,11 +34,17 @@ jobs:
             echo "No tests found or tests failed"
           fi
 
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
+      - name: Create icons
+        run: |
+          mkdir -p assets
+          # Create a simple colored circle as icon using ImageMagick
+          convert -size 128x128 xc:transparent -fill "#FF6B6B" -draw "circle 64,64 64,20" assets/icon.png
+
       - name: Build extension
         run: |
-          # Create minimal icon to avoid build warnings
-          mkdir -p assets
-          echo '<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" fill="#FF6B6B"/></svg>' > assets/icon.svg
           npm run build
           npm run package
 

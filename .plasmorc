@@ -1,0 +1,11 @@
+{
+  "manifest": {
+    "permissions": [
+      "storage",
+      "notifications", 
+      "alarms"
+    ]
+  },
+  "browser": "chrome",
+  "minify": false
+}
