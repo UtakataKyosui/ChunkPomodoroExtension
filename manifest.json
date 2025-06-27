@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "チャンクポモドーロセッター",
+  "description": "Time management Chrome extension using 2-hour chunks combined with the Pomodoro technique",
+  "version": "1.0.0",
+  "permissions": [
+    "storage",
+    "notifications",
+    "alarms"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "チャンクポモドーロセッター"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html",
+  "icons": {
+    "16": "assets/icon.svg",
+    "48": "assets/icon.svg", 
+    "128": "assets/icon.svg"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

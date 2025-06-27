@@ -21,6 +21,14 @@
   ],
   "author": "",
   "license": "MIT",
+  "manifest": {
+    "manifest_version": 3,
+    "permissions": [
+      "storage",
+      "notifications",
+      "alarms"
+    ]
+  },
   "devDependencies": {
     "@types/node": "^24.0.4",
     "autoprefixer": "^10.4.21",
@@ -29,9 +37,6 @@
     "shadcn-ui": "^0.9.5",
     "tailwindcss": "^4.1.11",
     "tailwindcss-animate": "^1.0.7"
-  },
-  "manifest": {
-    "version": 3
   },
   "dependencies": {
     "@radix-ui/react-progress": "^1.1.7",
