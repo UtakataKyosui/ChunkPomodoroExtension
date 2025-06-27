@@ -1,8 +1,9 @@
-name: Release Chrome Extension
+name: Plasmo Chrome Extension Release
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       version_type:
@@ -37,13 +38,10 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Check if release is needed
         id: check
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "should-release=true" >> $GITHUB_OUTPUT
           else
             # Check for [release] in commit message or significant changes
@@ -63,6 +61,12 @@ jobs:
           
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             BUMP_TYPE="${{ github.event.inputs.version_type }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # Extract version from tag
+            NEW_VERSION="${{ github.ref_name }}"
+            NEW_VERSION=${NEW_VERSION#v}  # Remove 'v' prefix
+            echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            exit 0
           else
             LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
             if [[ "$LAST_COMMIT_MSG" == *"BREAKING CHANGE"* ]] || [[ "$LAST_COMMIT_MSG" == *"feat!"* ]]; then
@@ -92,8 +96,6 @@ jobs:
           esac
           
           echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "Current version: $CURRENT_VERSION"
-          echo "New version: $NEW_VERSION"
 
   build-and-release:
     needs: check-changes
@@ -111,22 +113,30 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Update version in package.json
-        run: |
-          NEW_VERSION="${{ needs.check-changes.outputs.new-version }}"
-          npm version $NEW_VERSION --no-git-tag-version
-
       - name: Install ImageMagick
         run: sudo apt-get update && sudo apt-get install -y imagemagick
 
       - name: Create icons
         run: |
           mkdir -p assets
-          # Create a simple colored circle as icon using ImageMagick
-          convert -size 128x128 xc:transparent -fill "#FF6B6B" -draw "circle 64,64 64,20" assets/icon.png
+          # Create a pomodoro timer icon using ImageMagick
+          convert -size 128x128 xc:transparent \
+            -fill "#FF6B6B" -draw "circle 64,64 64,20" \
+            -fill "#FFFFFF" -draw "circle 64,64 44,20" \
+            -stroke "#333333" -strokewidth 2 -fill none -draw "circle 64,64 44,20" \
+            -stroke "#333333" -strokewidth 3 -draw "line 64,64 64,30" \
+            -stroke "#333333" -strokewidth 2 -draw "line 64,64 92,64" \
+            -fill "#333333" -draw "circle 64,64 3,0" \
+            assets/icon.png
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update version in package.json
+        if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
+        run: |
+          NEW_VERSION="${{ needs.check-changes.outputs.new-version }}"
+          npm version $NEW_VERSION --no-git-tag-version
 
       - name: Build extension
         run: |
@@ -149,6 +159,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Git tag
+        if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
         run: |
           NEW_VERSION="${{ needs.check-changes.outputs.new-version }}"
           git config --local user.email "action@github.com"
@@ -165,6 +176,20 @@ jobs:
           PACKAGE_PATH=$(find build -name "*.zip" -type f | head -1)
           echo "package-path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
           echo "package-name=$(basename $PACKAGE_PATH)" >> $GITHUB_OUTPUT
+
+      # Use Plasmo's official Browser Platform Publisher
+      - name: Browser Platform Publish
+        if: false  # Enable this when you have store credentials
+        uses: PlasmoHQ/bpp@v3
+        with:
+          keys: ${{ secrets.BPP_KEYS }}
+          chrome-file: ${{ steps.find-package.outputs.package-path }}
+          chrome-notes: |
+            チャンクポモドーロセッター v${{ needs.check-changes.outputs.new-version }}
+            
+            ${{ steps.changelog.outputs.CHANGELOG }}
+          version-file: package.json
+          verbose: true
 
       - name: Create GitHub Release
         uses: actions/create-release@v1
@@ -199,11 +224,3 @@ jobs:
           asset_path: ${{ steps.find-package.outputs.package-path }}
           asset_name: ${{ steps.find-package.outputs.package-name }}
           asset_content_type: application/zip
-
-      - name: Update Chrome Web Store (Optional)
-        if: false  # Enable this when you have Chrome Web Store credentials
-        run: |
-          # Placeholder for Chrome Web Store upload
-          # You'll need to set up CHROME_EXTENSION_ID and CHROME_CLIENT_SECRET secrets
-          echo "Chrome Web Store upload would happen here"
-          echo "Extension ID: $CHROME_EXTENSION_ID"

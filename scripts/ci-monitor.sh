@@ -98,12 +98,13 @@ analyze_and_fix() {
 fix_tailwindcss_postcss() {
     echo -e "${BLUE}🔧 Fixing TailwindCSS PostCSS configuration...${NC}"
     
-    # Add @tailwindcss/postcss if not present
+    # Ensure TailwindCSS v4 and PostCSS plugin are installed
     if ! grep -q "@tailwindcss/postcss" package.json; then
-        npm install --save-dev @tailwindcss/postcss
+        echo -e "${YELLOW}📦 Installing TailwindCSS v4 PostCSS plugin...${NC}"
+        npm install --save-dev @tailwindcss/postcss@4.0.0-alpha.26 tailwindcss@4.0.0-alpha.26
     fi
     
-    # Update postcss.config.js
+    # Update postcss.config.js for v4
     cat > postcss.config.js << 'EOF'
 module.exports = {
   plugins: {
@@ -113,7 +114,7 @@ module.exports = {
 }
 EOF
     
-    echo -e "${GREEN}✅ TailwindCSS PostCSS configuration fixed${NC}"
+    echo -e "${GREEN}✅ TailwindCSS v4 PostCSS configuration fixed${NC}"
 }
 
 fix_missing_tsconfig() {
@@ -203,17 +204,20 @@ EOF
 fix_dependency_issues() {
     echo -e "${BLUE}🔧 Fixing dependency issues...${NC}"
     
-    # Fix TailwindCSS version conflicts
+    # Ensure TailwindCSS v4 is properly configured
     if grep -q "tailwindcss.*4\." package.json; then
-        echo -e "${YELLOW}📦 Downgrading TailwindCSS to stable v3...${NC}"
-        sed -i 's/"tailwindcss": "^4\.[^"]*"/"tailwindcss": "^3.4.16"/g' package.json
-        sed -i '/@tailwindcss\/postcss/d' package.json
+        echo -e "${YELLOW}📦 Ensuring TailwindCSS v4 compatibility...${NC}"
         
-        # Fix postcss config for v3
+        # Ensure both packages are present for v4
+        if ! grep -q "@tailwindcss/postcss" package.json; then
+            npm install --save-dev @tailwindcss/postcss@4.0.0-alpha.26
+        fi
+        
+        # Update postcss config for v4
         cat > postcss.config.js << 'EOF'
 module.exports = {
   plugins: {
-    tailwindcss: {},
+    '@tailwindcss/postcss': {},
     autoprefixer: {},
   },
 }
