@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(git worktree:*)",
+      "Bash(git pull:*)",
+      "Bash(touch:*)",
+      "Bash(ls:*)",
+      "Bash(node:*)",
+      "Bash(npm --version)",
+      "Bash(npm install)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(mkdir:*)",
+      "Bash(chmod:*)"
+    ],
+    "deny": []
+  },
+  "enabledMcpjsonServers": [
+    "file-system",
+    "github",
+    "fetch",
+    "docker",
+    "sqlite",
+    "playwright"
+  ],
+  "enableAllProjectMcpServers": true
+}

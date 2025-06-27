@@ -1,0 +1,112 @@
+{
+	"name": "Chrome Extension Development Environment (Plasmo)",
+	"image": "mcr.microsoft.com/devcontainers/base:bullseye",
+	"features": {
+		"ghcr.io/anthropics/devcontainer-features/claude-code:latest": {},
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "lts"
+		},
+		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/devcontainers/features/git:1": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {}
+	},
+	"forwardPorts": [
+		1012,
+		1013,
+		1815
+	],
+	"portsAttributes": {
+		"1012": {
+			"label": "Plasmo Dev Server",
+			"onAutoForward": "notify"
+		},
+		"1013": {
+			"label": "Plasmo Extension Reload",
+			"onAutoForward": "silent"
+		},
+		"1815": {
+			"label": "Plasmo Content Script HMR",
+			"onAutoForward": "silent"
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"biomejs.biome",
+				"ms-vscode.vscode-typescript-next",
+				"christian-kohler.path-intellisense",
+				"christian-kohler.npm-intellisense",
+				"ms-vscode.vscode-json",
+				"bradlc.vscode-tailwindcss",
+				"formulahendry.auto-rename-tag",
+				"ms-vscode.js-debug",
+				"eamodio.gitlens",
+				"usernamehw.errorlens",
+				"PKief.material-icon-theme",
+				"mikestead.dotenv",
+				"ms-playwright.playwright",
+				"esbenp.prettier-vscode",
+				"ms-vscode.extension-test-runner",
+				"TabNine.tabnine-vscode"
+			],
+			"settings": {
+				"workbench.colorTheme": "GitHub Dark",
+				"workbench.iconTheme": "material-icon-theme",
+				"editor.fontFamily": "'Fira Code', 'Droid Sans Mono', 'monospace', monospace",
+				"editor.fontLigatures": true,
+				"editor.fontSize": 14,
+				"editor.formatOnSave": true,
+				"editor.defaultFormatter": "biomejs.biome",
+				"editor.codeActionsOnSave": {
+					"quickfix.biome": "explicit",
+					"source.organizeImports.biome": "explicit"
+				},
+				"typescript.preferences.importModuleSpecifier": "relative",
+				"typescript.suggest.autoImports": true,
+				"typescript.updateImportsOnFileMove.enabled": "always",
+				"typescript.inlayHints.enumMemberValues.enabled": true,
+				"typescript.inlayHints.functionLikeReturnTypes.enabled": true,
+				"typescript.inlayHints.parameterNames.enabled": "literals",
+				"typescript.inlayHints.parameterTypes.enabled": true,
+				"typescript.inlayHints.propertyDeclarationTypes.enabled": true,
+				"typescript.inlayHints.variableTypes.enabled": false,
+				"javascript.suggest.autoImports": true,
+				"javascript.updateImportsOnFileMove.enabled": "always",
+				"files.exclude": {
+					"**/node_modules": true,
+					"**/build": true,
+					"**/.plasmo": true,
+					"**/dist": true,
+					"**/.git": true,
+					"**/.DS_Store": true,
+					"**/Thumbs.db": true
+				},
+				"search.exclude": {
+					"**/node_modules": true,
+					"**/build": true,
+					"**/.plasmo": true,
+					"**/dist": true,
+					"**/.git": true
+				},
+				"emmet.includeLanguages": {
+					"typescript": "html",
+					"typescriptreact": "html"
+				},
+				"git.autofetch": true,
+				"git.confirmSync": false,
+				"git.enableSmartCommit": true,
+				"terminal.integrated.defaultProfile.linux": "bash",
+				"terminal.integrated.fontSize": 13,
+				"explorer.confirmDelete": false,
+				"explorer.confirmDragAndDrop": false,
+				"chrome.executable": "/usr/bin/google-chrome-stable"
+			}
+		}
+	},
+	"postCreateCommand": "bash /workspace/setup-devtools.sh",
+	"remoteEnv": {
+		"PLASMO_BROWSER": "chrome",
+		"NODE_ENV": "development",
+		"CHROME_EXTENSION_DEV": "true"
+	}
+}

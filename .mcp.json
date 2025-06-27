@@ -1,0 +1,23 @@
+{
+	"mcpServers": {
+		"file-system": {
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspaces"]
+		},
+		"github": {
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-github"],
+			"env": {
+				"GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PERSONAL_ACCESS_TOKEN"
+			}
+		},
+		"fetch": {
+			"command": "uvx",
+			"args": ["mcp-server-fetch"]
+		},
+		"playwright": {
+			"command": "npx",
+			"args": ["-y", "@executeautomation/playwright-mcp-server"]
+		}
+	}
+}
